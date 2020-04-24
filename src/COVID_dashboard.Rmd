@@ -1,0 +1,269 @@
+---
+title: "COVID-19 Dashboard"
+runtime: shiny
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    source_code: https://github.com/MarcovChain/COVIDdashboard
+    vertical_layout: fill
+---
+
+<style>                     
+.navbar {
+background-color:#C5683B;
+border-color:white;
+}
+.navbar-brand {
+color:white!important;
+}.section.sidebar {
+background-color: #FFFFFF;
+}
+</style>  
+
+```{r setup}
+knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
+library(flexdashboard)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(stringr)
+library(readr)
+library(tidyr)
+library(ggthemes)
+library(magrittr)
+```
+
+```{r world data, eval=FALSE, include=FALSE}
+# world population data
+world_pop = 75000000000
+
+# world cases
+# ecdc_url <- paste0("https://www.ecdc.europa.eu/sites/default/files/documents/COVID-19-geographic-disbtribution-worldwide-", as.character(Sys.Date()), ".csv")
+# world_cases <- read_csv(ecdc_url)
+
+# world events
+#world_events <-read_excel("data/20200323-acaps-covid-19-goverment-measures-dataset-v1.xlsx")
+
+
+```
+
+```{r Canadian data}
+# canada population
+can_pop <- 37647306
+province_pop <- read_csv("../data/province_pop.csv")
+province_pop <- province_pop %>% 
+                      mutate(percentage = population / can_pop)
+
+# canada cases
+province_cases <- read_csv("../data/province_cases.csv") 
+
+province_cases_long  <- province_cases %>%  
+                        pivot_longer(
+                        cols = `Canada`:`NS`, 
+                        names_to = "province", 
+                        values_to = "cases",
+                        values_drop_na = TRUE
+                    )
+
+# provincial events dataframe
+# province_events <- data.frame(Date=as.Date(character()),
+#                  province=character(), 
+#                  event=character(), 
+#                  stringsAsFactors=FALSE) 
+
+# Alberta events
+# province_events <-  province_events %>%  
+#     add_row(Date = "2020-03-16", province = "AB", event = "schools & licensed daycares closed") %>% 
+#     add_row(Date = "2020-03-17", province = "AB", event = "state of emergency declared") %>% 
+#     add_row(Date = "2020-03-25", province = "AB", event = "public health orders are now law") %>% 
+#     add_row(Date = "2020-03-27", province = "AB", event = "Provincial parks closed to motor vehicle access") %>% 
+#     add_row(Date = "2020-03-27", province = "AB", event = "Closure of non-essential businesses")
+
+# federal events
+# province_events <-  province_events %>% 
+#     add_row(Date = "2020-03-14", province = "Canada", event = "travel advisory to avoid all non-essential travel outside of Canada") %>% 
+#     add_row(Date = "2020-03-16", province = "Canada", event = "banned entry of all non-Canadians into Canada") %>%
+#     add_row(Date = "2020-03-18", province = "Canada", event = "Canadian-US border closed to all non-essential travel") %>%  
+#     add_row(Date = "2020-03-24", province = "Canada", event = "National parks closed to motor vehicle access") %>%
+#     add_row(Date = "2020-03-25", province = "Canada", event = "immediate 14 day quarantine for all Canadians returning to Canada")
+
+# Other provincial events
+# province_events <-  province_events %>%  
+#     add_row(Date = "2020-03-18", province = "BC", event = "state of emergency declared") %>% 
+#     add_row(Date = "2020-03-17", province = "ON", event = "state of emergency declared") %>% 
+#     add_row(Date = "2020-04-08", province = "BC", event = "provincial parks closed")
+
+```
+
+```{r Canada data ratio calculations}
+# dataframe to store ratio values
+province_ratio <- province_cases
+ 
+# calculate province:nation ratios 
+province_ratio$Canada <- province_cases$Canada / province_cases$Canada
+province_ratio$AB <- province_cases$AB / province_cases$Canada / 0.115
+province_ratio$NL <- province_cases$NL / province_cases$Canada / 0.0139
+province_ratio$MB <- province_cases$MB / province_cases$Canada / 0.0361
+province_ratio$ON <- province_cases$ON / province_cases$Canada / 0.384
+province_ratio$QC <- province_cases$QC / province_cases$Canada / 0.224
+province_ratio$BC <- province_cases$BC / province_cases$Canada / 0.133
+province_ratio$SK <- province_cases$SK / province_cases$Canada / 0.0310
+province_ratio$PEI <- province_cases$PEI / province_cases$Canada / 0.00411
+province_ratio$NB <- province_cases$NB / province_cases$Canada / 0.0205
+province_ratio$NS <- province_cases$NS / province_cases$Canada / 0.0256
+ 
+# round data to two decimal places
+province_ratio[,3:12] <- round(province_ratio[,3:12], digits = 2)
+ 
+province_ratio_long  <- province_ratio %>%  
+                        pivot_longer(
+                        cols = `Canada`:`NS`, 
+                        names_to = "province", 
+                        values_to = "ratio",
+                        values_drop_na = TRUE
+                    )
+```
+
+```{r data per capita calculation}
+# dataframe to store ratio values
+province_pc <- province_cases
+
+# calculate per capita rates 
+pcr = 100000
+province_pc$Canada <- province_cases$Canada / can_pop * pcr
+province_pc$AB <- province_cases$AB / province_pop$population[province_pop$province == "AB"] * pcr
+province_pc$NL <- province_cases$NL / province_pop$population[province_pop$province == "NL"] * pcr
+province_pc$MB <- province_cases$MB / province_pop$population[province_pop$province == "MB"] * pcr
+province_pc$ON <- province_cases$ON / province_pop$population[province_pop$province == "ON"] * pcr
+province_pc$QC <- province_cases$QC / province_pop$population[province_pop$province == "QC"] * pcr
+province_pc$BC <- province_cases$BC / province_pop$population[province_pop$province == "BC"] * pcr
+province_pc$SK <- province_cases$SK / province_pop$population[province_pop$province == "SK"] * pcr
+province_pc$PEI <- province_cases$PEI / province_pop$population[province_pop$province == "PEI"] * pcr
+province_pc$NB <- province_cases$NB / province_pop$population[province_pop$province == "NB"] * pcr
+province_pc$NS <- province_cases$NS / province_pop$population[province_pop$province == "NS"] * pcr
+
+# round data to two decimal places
+province_pc[,3:12] <- round(province_pc[,3:12], digits = 2)
+
+province_pc_long  <- province_pc %>%  
+                        pivot_longer(
+                        cols = `Canada`:`NS`, 
+                        names_to = "province", 
+                        values_to = "per_100000",
+                        values_drop_na = TRUE
+                    )
+```
+
+
+Trends
+=====================================
+
+Column {.tabset}
+-------------------------------------
+
+### Provincial cases
+
+Number of confirmed cases plotted on a log10 scale. 
+
+```{r}
+# Confirmed cases
+p <- ggplot(data=province_cases_long, aes(x=Date, y=cases, group = province)) +
+      geom_line(aes(color=province), size = 1.75, alpha=0.8) +
+      #scale_color_brewer(palette="Paired") +
+      #scale_colour_tableau(palette = "Classic 20") +
+      scale_color_manual(values = c("#1f77b4", "#2ca02c", "#ff7f0e", "#d62728", "#aec7e8", "#98df8a", 
+                                     "#ffbb78", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94")) +
+      theme_solarized(base_size = 16) +
+      scale_y_log10()
+      # geom_vline(data = province_events, aes(xintercept = jitter(as.numeric(Date), 1),
+      #                                        colour = province,
+      #                                        text = paste("Date:", Date, "\n",
+      #                                                     "Event:", event)))
+
+ggplotly(p)
+
+```
+
+### Provincial cases per 100,000 people
+
+Number of cases in each province, per 100,000 people. 
+
+```{r}
+# Per capita cases
+p <- ggplot(data=province_pc_long, aes(x=Date, y=per_100000, group = province)) +
+      geom_line(aes(color=province), size = 1.75) +
+      scale_color_manual(values = c("#1f77b4", "#2ca02c", "#ff7f0e", "#d62728", "#aec7e8", "#98df8a", 
+                                     "#ffbb78", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94")) +
+      theme_solarized(base_size = 16)
+      #scale_y_log10() + 
+      # geom_vline(data = province_events, aes(xintercept = jitter(as.numeric(Date), 1), 
+      #                                        colour = province,
+      #                                        text = paste("Event:", event)))
+
+ggplotly(p)
+
+```
+
+### Ratio of provincial cases to Canadian cases 
+ 
+**Ratio** refers to the number of confirmed cases compared to Canadian cases (ie. a value of 2 means that a province has 2x the number of cases compared to Canada overall)
+ 
+```{r}
+# Ratio of cases
+p <- ggplot(data=province_ratio_long, aes(x=Date, y=ratio, group = province)) +
+      geom_line(aes(color=province), size = 1.75) +
+      scale_color_manual(values = c("#1f77b4", "#2ca02c", "#ff7f0e", "#d62728", "#aec7e8", "#98df8a", 
+                                     "#ffbb78", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94")) +
+      theme_solarized(base_size = 16)
+      # geom_vline(data = province_events, aes(xintercept = jitter(as.numeric(Date), 1), 
+      #                                        colour = province,
+      #                                        text = paste("Event:", event)))
+ 
+ggplotly(p)
+ 
+```
+
+.
+.
+
+Data
+=====================================
+
+Column {.tabset}
+-------------------------------------
+ 
+ 
+### Canadian data
+ 
+Data sources:  
+https://www.arcgis.com/apps/opsdashboard/index.html#/bda7594740fd40299423467b48e9ecf6 retrieved daily and collated by Essen Boulet
+ 
+```{r}
+DT::datatable(province_cases, options = list(pageLength = 50))
+```
+
+### Canadian events
+Data sources:  
+https://www.alberta.ca/covid-19-alberta-data.aspx  
+https://www.mccarthy.ca/en/insights/articles/covid-19-emergency-measures-tracker  
+
+```{r}
+#DT::datatable(province_events, options = list(pageLength = 50))
+```
+
+
+<!-- ### World data -->
+
+<!-- World data sources:    -->
+<!-- https://www.ecdc.europa.eu/en/publications-data/download-todays-data-geographic-distribution-covid-19-cases-worldwide   -->
+<!-- https://data.humdata.org/dataset/acaps-covid19-government-measures-dataset   -->
+<!-- https://data.humdata.org/dataset/e1a91ae0-292d-4434-bc75-bf863d4608ba/resource/9064f002-1b26-4af3-b990-c843ddc24b75/download/20200323-acaps-covid-19-goverment-measures-dataset-v1.xlsx   -->
+
+```{r}
+# DT::datatable(world_cases, options = list(pageLength = 50))
+```
+### Other visualizations
+https://www.visualcapitalist.com/infection-trajectory-flattening-the-covid19-curve/  
+
+
